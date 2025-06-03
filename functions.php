@@ -10,9 +10,11 @@ function classima_child_styles() {
 add_action( 'wp_enqueue_scripts', 'classima_child_scripts', 18 );
 function classima_child_scripts() {
 	wp_enqueue_script( "classipost-child-script", get_stylesheet_directory_uri() . "/assets/custom.js", [ "jquery" ], "1.0", true );
-	wp_enqueue_script( "classipost-listing-calendar", get_stylesheet_directory_uri() . "/assets/listing-calendar.js", [ "jquery", "rtcl-public" ],
-		"1.0",
-		true );
+	if ( Functions::is_listing() ) {
+		wp_enqueue_script( "classipost-listing-calendar", get_stylesheet_directory_uri() . "/assets/listing-calendar.js", [ "jquery", "rtcl-public" ],
+			"1.0",
+			true );
+	}
 }
 
 add_action( 'after_setup_theme', 'classima_child_theme_setup' );
@@ -51,6 +53,9 @@ add_action( 'wp_ajax_get_listing_calendar_meta', 'evenimentul_listing_calendar_m
 add_action( 'wp_ajax_nopriv_get_listing_calendar_meta', 'evenimentul_listing_calendar_meta' );
 
 function evenimentul_listing_calendar_meta() {
+	if ( ! Functions::verify_nonce() ) {
+		wp_send_json_error( 'Unauthorized Access!' );
+	}
 	$post_id = isset( $_GET['post_id'] ) ? absint( $_GET['post_id'] ) : 0;
 
 	if ( ! $post_id ) {
