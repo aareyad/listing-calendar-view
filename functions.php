@@ -170,7 +170,7 @@ add_filter( 'rtcl_ajax_filter_cf_field_html', function ( $field_html, $field, $p
 							'singleDatePicker' => $field->getData( 'filterable_date_type' ) === 'single',
 							'autoUpdateInput'  => false,
 							'locale'           => [
-								'format' => 'D MMMM YYYY'
+								'format' => 'MMMM D, YYYY'
 							]
 						]
 					)
