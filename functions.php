@@ -66,7 +66,18 @@ function evenimentul_listing_calendar_meta() {
 		wp_send_json_error( 'Invalid post ID' );
 	}
 
-	$meta = get_post_meta( $post_id, 'evenimentul_calendar_mbhm20lv', true );
+	$form_id = get_post_meta( $post_id, '_rtcl_form_id', true );
+
+	if ( ! $form_id ) {
+		wp_send_json_error( 'Invalid form ID' );
+	}
+
+	$form  = Form::query()->find( $form_id );
+	$field = $form->getFieldBy( 'element', 'evenimentul_calendar' );
+
+	$meta_key = $field['name'] ?? '';
+
+	$meta = get_post_meta( $post_id, $meta_key, true );
 
 	wp_send_json_success( $meta );
 }
