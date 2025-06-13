@@ -88191,9 +88191,9 @@ var ListingCalendar = function ListingCalendar() {
             marginBottom: 4
           },
           children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("span", {
-            children: dayjs__WEBPACK_IMPORTED_MODULE_1___default()(slot.start, 'HH:mm').format('hh:mm A')
+            children: dayjs__WEBPACK_IMPORTED_MODULE_1___default()(slot.start, 'HH:mm').format('HH:mm')
           }), " - ", /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_5__.jsx)("span", {
-            children: dayjs__WEBPACK_IMPORTED_MODULE_1___default()(slot.end, 'HH:mm').format('hh:mm A')
+            children: dayjs__WEBPACK_IMPORTED_MODULE_1___default()(slot.end, 'HH:mm').format('HH:mm')
           })]
         }, index);
       })

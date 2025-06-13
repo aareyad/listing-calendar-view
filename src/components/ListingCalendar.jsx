@@ -274,7 +274,7 @@ const ListingCalendar = () => {
 
                     return (
                         <div key={index} className={slot.status} style={{color: slotColor, marginBottom: 4}}>
-                            <span>{dayjs(slot.start, 'HH:mm').format('hh:mm A')}</span> - <span>{dayjs(slot.end, 'HH:mm').format('hh:mm A')}</span>
+                            <span>{dayjs(slot.start, 'HH:mm').format('HH:mm')}</span> - <span>{dayjs(slot.end, 'HH:mm').format('HH:mm')}</span>
                         </div>
                     );
                 })}
