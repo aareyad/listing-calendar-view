@@ -1,6 +1,7 @@
 <?php
 
 use Rtcl\Helpers\Functions;
+use Rtcl\Models\Form\Form;
 use Rtcl\Services\FormBuilder\Components\DateTime;
 
 add_action( 'wp_enqueue_scripts', 'classima_child_styles', 18 );
@@ -113,8 +114,7 @@ add_filter( 'rtcl_fb_editor_settings_placement', function ( $placement ) {
 			'icon',
 			'evenimentul_calendar_membership',
 			'filterable',
-			'filterable_date_type',
-			'evenimentul_filterable_date_format'
+			'filterable_date_type'
 		],
 		'advance' => [
 			'help_message',
@@ -137,20 +137,6 @@ add_filter( 'rtcl_fb_editor_settings_fields', function ( $settingsFields ) {
 		'help_text' => __( 'Only membership user able to add calendar data.', 'classima-child' ),
 	];
 
-	$settingsFields['evenimentul_filterable_date_format'] = [
-		'template'    => 'select',
-		'label'       => __( 'Filter Date Format', 'classima-child' ),
-		'filterable'  => true,
-		'creatable'   => true,
-		'placeholder' => __( 'Select Date Format', 'classima-child' ),
-		'options'     => $dateFormats,
-		'dependency'  => [
-			'depends_on' => 'filterable',
-			'value'      => true,
-			'operator'   => '==',
-		],
-	];
-
 	return $settingsFields;
 } );
 
@@ -162,12 +148,10 @@ add_filter( 'rtcl_ajax_filter_allow_fields', function ( $fields ) {
 } );
 
 // Render html for filter field
-add_filter( 'rtcl_ajax_filter_cf_field_html', function ( $field_html, $field ) {
+add_filter( 'rtcl_ajax_filter_cf_field_html', function ( $field_html, $field, $params ) {
 	if ( $field && 'evenimentul_calendar' == $field->getElement() ) {
 		$metaKey    = $field->getMetaKey();
 		$filterName = 'cf_' . $metaKey;
-
-		$params = $_REQUEST;
 
 		$values = ! empty( $params[ $filterName ] ) ? ( is_array( $params[ $filterName ] ) ? array_filter( array_map( function ( $param ) {
 			return trim( sanitize_text_field( wp_unslash( $param ) ) );
@@ -185,6 +169,9 @@ add_filter( 'rtcl_ajax_filter_cf_field_html', function ( $field_html, $field ) {
 						[
 							'singleDatePicker' => $field->getData( 'filterable_date_type' ) === 'single',
 							'autoUpdateInput'  => false,
+							'locale'           => [
+								'format' => 'D MMMM YYYY'
+							]
 						]
 					)
 				)
@@ -193,4 +180,169 @@ add_filter( 'rtcl_ajax_filter_cf_field_html', function ( $field_html, $field ) {
 	}
 
 	return $field_html;
+}, 10, 3 );
+
+
+// testing
+function business_hours_shortcode( $atts ) {
+	$atts = shortcode_atts( [
+		'view' => 'single' // or 'group'
+	], $atts, 'business_hours' );
+
+	$hours = [
+		'Monday'    => [ '11:00 AM – 4:00 PM' ],
+		'Tuesday'   => [ '11:00 AM – 4:00 PM' ],
+		'Wednesday' => [ '11:00 AM – 4:00 PM' ],
+		'Thursday'  => [ '10:00 AM – 02:00 PM' ],
+		'Friday'    => [ '10:00 AM – 02:00 PM', '04:00 PM – 11:00 PM' ],
+		'Saturday'  => [],
+		'Sunday'    => [],
+	];
+
+	$days          = [ 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday' ];
+	$start_of_week = (int) get_option( 'start_of_week' );
+	$ordered_days  = array_merge( array_slice( $days, $start_of_week ), array_slice( $days, 0, $start_of_week ) );
+	$day_indices   = array_flip( $ordered_days );
+
+	ob_start();
+	echo '<div class="business-hours"><ul>';
+
+	if ( $atts['view'] === 'single' ) {
+		foreach ( $ordered_days as $day ) {
+			$slots = $hours[ $day ] ?? [];
+			echo '<li><strong>' . esc_html( $day ) . ':</strong> ' . esc_html( empty( $slots ) ? 'Closed' : implode( ', ', $slots ) ) . '</li>';
+		}
+	} else {
+		// Group days by identical times
+		$grouped = [];
+		foreach ( $hours as $day => $slots ) {
+			$key               = empty( $slots ) ? 'Closed' : implode( '|', $slots );
+			$grouped[ $key ][] = $day;
+		}
+
+		foreach ( $grouped as $time_key => $days_group ) {
+			usort( $days_group, fn( $a, $b ) => $day_indices[ $a ] - $day_indices[ $b ] );
+			$label = format_day_ranges( $days_group, $ordered_days );
+			$time  = $time_key === 'Closed' ? 'Closed' : str_replace( '|', ', ', $time_key );
+			echo '<li><strong>' . esc_html( $label ) . ':</strong> ' . esc_html( $time ) . '</li>';
+		}
+	}
+
+	echo '</ul></div>';
+
+	return ob_get_clean();
+}
+
+add_shortcode( 'business_hours', 'business_hours_shortcode' );
+
+function format_day_ranges( array $days, array $ordered_days ): string {
+	$index  = array_flip( $ordered_days );
+	$ranges = [];
+	$start  = $end = $days[0];
+
+	for ( $i = 1, $len = count( $days ); $i < $len; $i ++ ) {
+		if ( $index[ $days[ $i ] ] === $index[ $end ] + 1 ) {
+			$end = $days[ $i ];
+		} else {
+			$ranges[] = $start === $end ? $start : "$start – $end";
+			$start    = $end = $days[ $i ];
+		}
+	}
+	$ranges[] = $start === $end ? $start : "$start – $end";
+
+	return implode( ', ', $ranges );
+}
+
+// filter localize data
+add_filter( 'rtcl_localize_fb_params', function ( $localized_data ) {
+
+	if ( class_exists( 'RtclStore' ) ) {
+		$member                               = rtclStore()->factory->get_membership( get_current_user_id() );
+		$localized_data['is_membership_user'] = is_user_logged_in() && \RtclStore\Helpers\Functions::is_membership_enabled() && ! $member->is_expired();
+	}
+
+	return $localized_data;
+} );
+
+// filter listings based on availability
+
+add_filter( 'rtcl_ajax_filter_load_data_query_args', function ( $args, $params ) {
+	global $wpdb;
+
+	$meta_key  = 'evenimentul_calendar_mbhm20lv'; // update with field name
+	$param_key = 'cf_' . $meta_key;
+
+	if ( ! empty( $params ) && isset( $params[ $param_key ] ) ) {
+		$date = sanitize_text_field( $params[ $param_key ] );
+
+		$form  = Form::query()->find( 14 ); // update with form id
+		$field = $form->getFieldBy( 'name', $meta_key );
+
+		$date_type = $field['filterable_date_type'] ?? 'single';
+
+		$available_listings = [];
+
+		if ( ! empty( $date ) ) {
+
+			$post_ids = $wpdb->get_col( $wpdb->prepare( "SELECT post_id FROM $wpdb->postmeta WHERE meta_key = %s", $meta_key ) );
+
+			if ( 'range' === $date_type ) {
+				$dates      = explode( '-', $date );
+				$start_date = date( 'Y-m-d', strtotime( trim( $dates[0] ) ) );
+				$end_date   = date( 'Y-m-d', strtotime( trim( $dates[1] ) ) );
+
+				// Convert to DateTime
+				$start = new \DateTime( $start_date );
+				$end   = new \DateTime( $end_date );
+				$end->modify( '+1 day' ); // include end date
+
+				$interval = new \DateInterval( 'P1D' ); // 1 day
+				$period   = new \DatePeriod( $start, $interval, $end );
+
+				foreach ( $period as $date ) {
+					$date_arr = explode( '-', $date->format( 'Y-m-d' ) );
+
+					if ( ! empty( $post_ids ) ) {
+						foreach ( $post_ids as $post_id ) {
+							$calendar_data = get_post_meta( $post_id, $meta_key, true );
+							$data          = $calendar_data[ $date_arr[0] ][ $date_arr[1] ][ $date_arr[2] ];
+
+							if ( isset( $data['status'] ) && 'available' === $data['status'] ) {
+								$available_listings[] = $post_id;
+							}
+						}
+					}
+				}
+			} else {
+				$date_arr = explode( '-', date( 'Y-m-d', strtotime( $date ) ) );
+
+				if ( ! empty( $post_ids ) ) {
+					foreach ( $post_ids as $post_id ) {
+						$calendar_data = get_post_meta( $post_id, $meta_key, true );
+						$data          = $calendar_data[ $date_arr[0] ][ $date_arr[1] ][ $date_arr[2] ];
+
+						if ( isset( $data['status'] ) && 'available' === $data['status'] ) {
+							$available_listings[] = $post_id;
+						}
+					}
+				}
+			}
+		}
+
+		if ( ! empty( $available_listings ) ) {
+
+			$args['post__in'] = array_unique( $available_listings );
+
+			if ( ! empty( $args['meta_query'] ) ) {
+				foreach ( $args['meta_query'] as $meta_index => $meta ) {
+					if ( isset( $meta['key'] ) && $meta_key === $meta['key'] ) {
+						unset( $args['meta_query'][ $meta_index ] );
+					}
+				}
+			}
+		}
+
+	}
+
+	return $args;
 }, 10, 2 );
